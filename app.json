@@ -10,6 +10,7 @@
     "backgroundColor": "#0B0E12",
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.abdelrahman.trainernotebook",
       "infoPlist": {
         "NSCameraUsageDescription": "Take progress photos for client records.",
         "NSPhotoLibraryUsageDescription": "Pick progress photos for client records."
