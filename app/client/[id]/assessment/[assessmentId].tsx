@@ -16,8 +16,8 @@ import { formatDate } from "@/lib/utils/date";
 
 export default function AssessmentDetailScreen() {
   const router = useRouter();
-  const { clientId, assessmentId } = useLocalSearchParams<{
-    clientId: string;
+  const { id, assessmentId } = useLocalSearchParams<{
+    id: string;
     assessmentId: string;
   }>();
   const { data: detail, isLoading } = useAssessmentDetail(assessmentId);
@@ -143,7 +143,7 @@ export default function AssessmentDetailScreen() {
 
       <View>
         <Text className="font-heading text-body mb-2 text-base">Photos</Text>
-        <ClientPhotosSection clientId={clientId} assessmentId={assessmentId} />
+        <ClientPhotosSection clientId={id} assessmentId={assessmentId} />
       </View>
 
       <Sheet

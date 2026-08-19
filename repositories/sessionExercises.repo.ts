@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 
 import { db } from "../db/client";
 import { exercises, sessionExercises } from "../db/schema";
@@ -22,7 +22,7 @@ export async function addExerciseToSession(
         eq(sessionExercises.isDeleted, false)
       )
     )
-    .orderBy(asc(sessionExercises.orderIndex))
+    .orderBy(desc(sessionExercises.orderIndex))
     .limit(1);
 
   const row = {

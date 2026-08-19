@@ -15,12 +15,23 @@ interface ClientAssessmentsSectionProps {
 
 export function ClientAssessmentsSection({ clientId, onNewAssessment }: ClientAssessmentsSectionProps) {
   const router = useRouter();
-  const { data: assessments, isLoading } = useAssessments(clientId);
+  const { data: assessments, isLoading, isError } = useAssessments(clientId);
 
   if (isLoading) {
     return (
       <View className="items-center py-12">
         <ActivityIndicator color="#F5A524" />
+      </View>
+    );
+  }
+
+  if (isError) {
+    return (
+      <View className="items-center gap-1 rounded-lg border border-line bg-surface px-4 py-8">
+        <Text className="text-body text-[14px] font-medium">Could not load assessments.</Text>
+        <Text className="text-faint text-[12px] text-center">
+          Pull to refresh to try again.
+        </Text>
       </View>
     );
   }

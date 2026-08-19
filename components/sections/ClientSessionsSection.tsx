@@ -1,8 +1,8 @@
 import { useRouter } from "expo-router";
-import { ClipboardList, Copy } from "lucide-react-native";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ClipboardList, Copy, Trash2 } from "lucide-react-native";
+import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
 
-import { useSessions } from "../../lib/hooks/useSessions";
+import { useDeleteSession, useSessions } from "../../lib/hooks/useSessions";
 import { formatDate } from "../../lib/utils/date";
 import { EmptyState } from "../ui/EmptyState";
 
@@ -13,12 +13,39 @@ interface ClientSessionsSectionProps {
 
 export function ClientSessionsSection({ clientId, onNewSession }: ClientSessionsSectionProps) {
   const router = useRouter();
-  const { data: sessions, isLoading } = useSessions(clientId);
+  const { data: sessions, isLoading, isError } = useSessions(clientId);
+  const deleteSession = useDeleteSession();
+
+  const confirmDelete = (sessionId: string, date: string) => {
+    Alert.alert(
+      "Delete session",
+      `Remove the session from ${formatDate(date)} and its logged sets from history?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteSession.mutate(sessionId),
+        },
+      ]
+    );
+  };
 
   if (isLoading) {
     return (
       <View className="items-center py-12">
         <ActivityIndicator color="#F5A524" />
+      </View>
+    );
+  }
+
+  if (isError) {
+    return (
+      <View className="items-center gap-1 rounded-lg border border-line bg-surface px-4 py-8">
+        <Text className="text-body text-[14px] font-medium">Could not load sessions.</Text>
+        <Text className="text-faint text-[12px] text-center">
+          Pull to refresh to try again.
+        </Text>
       </View>
     );
   }
@@ -60,6 +87,15 @@ export function ClientSessionsSection({ clientId, onNewSession }: ClientSessions
               </View>
             </View>
           ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Delete session"
+            onPress={() => confirmDelete(s.id, s.date)}
+            style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+            className="mr-1.5 h-8 w-8 items-center justify-center rounded-md border border-danger/30 bg-dangerDim"
+          >
+            <Trash2 size={14} color="#F87171" />
+          </Pressable>
           <Text className="text-faint text-[11px] tabular-nums">open →</Text>
         </Pressable>
       ))}

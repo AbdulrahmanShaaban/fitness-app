@@ -22,8 +22,8 @@ import type { AssessmentType } from "@/types";
 
 export default function NewAssessmentScreen() {
   const router = useRouter();
-  const { clientId } = useLocalSearchParams<{ clientId: string }>();
-  const { data: client } = useClient(clientId);
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { data: client, isError } = useClient(id);
   const createAssessment = useCreateAssessment();
   const addTest = useAddTest();
 
@@ -39,7 +39,7 @@ export default function NewAssessmentScreen() {
     setSaving(true);
     try {
       const assessment = await createAssessment.mutateAsync({
-        clientId,
+        clientId: id,
         type,
         customTypeName:
           type === "custom" && customTypeName.trim().length > 0
@@ -63,11 +63,22 @@ export default function NewAssessmentScreen() {
           notes: t.notes.trim() || undefined,
         });
       }
-      router.replace(`/client/${clientId}/assessment/${assessment.id}`);
+      router.replace(`/client/${id}/assessment/${assessment.id}`);
     } finally {
       setSaving(false);
     }
   };
+
+  if (isError) {
+    return (
+      <View className="flex-1 items-center justify-center bg-ink px-8">
+        <Text className="text-body text-base">Could not load the client.</Text>
+        <Text className="mt-1 text-faint text-[13px] text-center">
+          Go back and try opening this screen again.
+        </Text>
+      </View>
+    );
+  }
 
   if (!client) {
     return (

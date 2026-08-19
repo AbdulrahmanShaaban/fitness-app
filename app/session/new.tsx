@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { Copy, Plus, X } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
@@ -32,17 +33,20 @@ import {
   useUpdateSet,
 } from "../../lib/hooks/useSessions";
 import { formatDate, todayIso } from "../../lib/utils/date";
+import { getErrorMessage } from "../../lib/utils/errors";
 
 export default function NewSessionScreen() {
   const router = useRouter();
+  const qc = useQueryClient();
   const { clientId } = useLocalSearchParams<{ clientId: string }>();
   const { data: client } = useClient(clientId);
 
   const createSession = useCreateSession();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
-  const { data: detail, isLoading } = useSessionDetail(sessionId ?? undefined);
+  const { data: detail, isLoading, isError, error } = useSessionDetail(sessionId ?? undefined);
   const updateSession = useUpdateSession();
   const copyPrevious = useCopyPreviousSession();
   const deleteSession = useDeleteSession();
@@ -54,6 +58,54 @@ export default function NewSessionScreen() {
 
   const [templateName, setTemplateName] = useState("");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [stuck, setStuck] = useState(false);
+  const [autoRetried, setAutoRetried] = useState(false);
+
+  useEffect(() => {
+    if (!(creating || isLoading)) {
+      setStuck(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      console.log("[session/new] stuck for 10s", { creating, isLoading, sessionId });
+      setStuck(true);
+      setTimeout(() => {
+        console.log("[session/new] auto-recovering from stuck", { creating, isLoading, sessionId });
+        if (sessionId) {
+          void qc.invalidateQueries({ queryKey: ["sessions", "detail", sessionId] });
+        } else {
+          setCreating(false);
+        }
+      }, 1500);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [creating, isLoading, sessionId, qc]);
+
+  useEffect(() => {
+    if (!isError || autoRetried) return;
+    console.log("[session/new] detail query error:", getErrorMessage(error));
+    const timer = setTimeout(() => {
+      setAutoRetried(true);
+      setStuck(false);
+      if (sessionId) {
+        void qc.invalidateQueries({ queryKey: ["sessions", "detail", sessionId] });
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [isError, autoRetried, error, sessionId, qc]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    const startedAt = Date.now();
+    console.log("[session/new] detail query fired", sessionId);
+    const interval = setInterval(() => {
+      console.log("[session/new] detail query still pending", Date.now() - startedAt, "ms");
+    }, 3000);
+    return () => {
+      clearInterval(interval);
+      console.log("[session/new] detail query settled", Date.now() - startedAt, "ms");
+    };
+  }, [sessionId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,11 +114,16 @@ export default function NewSessionScreen() {
       createSession
         .mutateAsync({ clientId })
         .then((s) => {
-          if (!cancelled) setSessionId(s.id);
-        })
-        .catch(() => {
           if (!cancelled) {
-            Alert.alert("Error", "Could not create the session.");
+            setCreateError(null);
+            setSessionId(s.id);
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            const message = getErrorMessage(err);
+            setCreateError(message);
+            Alert.alert("Could not create the session", message);
           }
         })
         .finally(() => {
@@ -171,7 +228,28 @@ export default function NewSessionScreen() {
           </View>
         </View>
 
-        {isLoading || creating ? (
+        {stuck || isError || createError ? (
+          <View className="items-center gap-2 rounded-lg border border-line bg-surface px-4 py-8">
+            <Text className="text-body text-[14px] font-medium">Could not load the session.</Text>
+            <Text className="text-faint text-[12px] text-center">
+              {createError ?? (error ? getErrorMessage(error) : "Taking too long — the database may be busy.")}
+            </Text>
+            <Button
+              label="Try again"
+              onPress={() => {
+                setStuck(false);
+                setCreateError(null);
+                if (sessionId) {
+                  void qc.invalidateQueries({ queryKey: ["sessions", "detail", sessionId] });
+                } else {
+                  setCreating(false);
+                }
+              }}
+              variant="secondary"
+              size="sm"
+            />
+          </View>
+        ) : creating || isLoading ? (
           <View className="items-center py-10">
             <ActivityIndicator color="#F5A524" />
           </View>
@@ -223,7 +301,18 @@ export default function NewSessionScreen() {
         onClose={() => setSheetOpen(false)}
         onAdd={(exerciseId) => {
           setSheetOpen(false);
-          if (sessionId) addExercise.mutate({ sessionId, exerciseId });
+          if (sessionId) {
+            addExercise.mutate(
+              { sessionId, exerciseId },
+              {
+                onError: () =>
+                  Alert.alert(
+                    "Could not add exercise",
+                    "Try again in a moment."
+                  ),
+              }
+            );
+          }
         }}
       />
     </KeyboardAvoidingView>

@@ -85,14 +85,15 @@ export async function pullAll(): Promise<void> {
 
   for (const table of SYNC_TABLES) {
     const remoteRows = await fetchAllRows(supabase, table);
-    for (const remote of remoteRows) {
-      const local = await getLocalRow(table.local, remote.id);
-      if (!local) {
-        await insertLocalRow(table.local, remote);
-      } else if (remote.updated_at > (local.updated_at ?? "")) {
-        await updateLocalRow(table.local, remote);
-      }
-    }
+    if (remoteRows.length === 0) continue;
+    const existing = await getLocalRows(table.local, remoteRows.map((r) => r.id));
+    const toInsert = remoteRows.filter((r) => !existing.has(r.id));
+    const toUpdate = remoteRows.filter((r) => {
+      const local = existing.get(r.id);
+      return local ? (r.updated_at ?? "") > local.updated_at : false;
+    });
+    if (toInsert.length > 0) await insertLocalRows(table.local, toInsert);
+    if (toUpdate.length > 0) await updateLocalRows(table.local, toUpdate);
   }
 }
 
@@ -104,6 +105,7 @@ export async function runSync(): Promise<void> {
   }
   store.setStatus("syncing");
   store.setLastError(null);
+  const startedAt = Date.now();
   try {
     const supabase = getSupabase();
     if (!supabase) return;
@@ -112,13 +114,21 @@ export async function runSync(): Promise<void> {
       store.setStatus("signed-out");
       return;
     }
+    const pullStart = Date.now();
     await pullAll();
+    console.log(`[sync] pull done in ${Date.now() - pullStart}ms`);
+    const pushStart = Date.now();
     await pushChanges();
+    console.log(`[sync] push done in ${Date.now() - pushStart}ms`);
+    const { expoDb } = await import("../db/client");
+    await expoDb.execAsync("PRAGMA wal_checkpoint(PASSIVE)");
     store.setStatus("synced");
     store.setLastSyncAt(new Date().toISOString());
+    console.log(`[sync] total ${Date.now() - startedAt}ms`);
   } catch (err) {
     store.setStatus("error");
     store.setLastError(getErrorMessage(err));
+    console.log(`[sync] error after ${Date.now() - startedAt}ms:`, getErrorMessage(err));
   }
 }
 
@@ -139,37 +149,45 @@ async function getDirtyRows(table: string): Promise<Record<string, unknown>[]> {
   ) as Promise<Record<string, unknown>[]>;
 }
 
-async function getLocalRow(
+async function getLocalRows(
   table: string,
-  id: string
-): Promise<{ updated_at: string } | null> {
+  ids: string[]
+): Promise<Map<string, { updated_at: string }>> {
   const { expoDb } = await import("../db/client");
+  if (ids.length === 0) return new Map();
+  const placeholders = ids.map(() => "?").join(", ");
   const rows = (await expoDb.getAllAsync(
-    `SELECT updated_at FROM ${table} WHERE id = ?`,
-    [id]
-  )) as { updated_at: string }[];
-  return rows[0] ?? null;
+    `SELECT id, updated_at FROM ${table} WHERE id IN (${placeholders})`,
+    ids
+  )) as { id: string; updated_at: string }[];
+  return new Map(rows.map((r) => [r.id, { updated_at: r.updated_at ?? "" }]));
 }
 
-async function insertLocalRow(table: string, row: RemoteRow): Promise<void> {
+function sqlLiteral(value: unknown): string {
+  if (value === null || value === undefined) return "NULL";
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+async function insertLocalRows(table: string, rows: RemoteRow[]): Promise<void> {
   const { expoDb } = await import("../db/client");
-  const keys = Object.keys(row);
+  const keys = Object.keys(rows[0]).filter((k) => k !== "user_id");
   const cols = keys.map((k) => `"${k}"`).join(", ");
-  const placeholders = keys.map(() => "?").join(", ");
-  await expoDb.runAsync(
-    `INSERT OR REPLACE INTO ${table} (${cols}) VALUES (${placeholders})`,
-    keys.map((k) => row[k] as SQLiteBindValue)
-  );
+  const values = rows
+    .map((row) => `(${keys.map((k) => sqlLiteral(row[k])).join(", ")})`)
+    .join(", ");
+  await expoDb.execAsync(`INSERT OR REPLACE INTO ${table} (${cols}) VALUES ${values}`);
 }
 
-async function updateLocalRow(table: string, row: RemoteRow): Promise<void> {
+async function updateLocalRows(table: string, rows: RemoteRow[]): Promise<void> {
   const { expoDb } = await import("../db/client");
-  const keys = Object.keys(row);
-  const assignments = keys.map((k) => `"${k}" = ?`).join(", ");
-  await expoDb.runAsync(
-    `UPDATE ${table} SET ${assignments} WHERE id = ?`,
-    [...keys.map((k) => row[k] as SQLiteBindValue), row.id]
+  const keys = Object.keys(rows[0]).filter((k) => k !== "user_id");
+  const statements = rows.map(
+    (row) =>
+      `UPDATE ${table} SET ${keys
+        .map((k) => `"${k}" = ${sqlLiteral(row[k])}`)
+        .join(", ")} WHERE id = ${sqlLiteral(row.id)}`
   );
+  await expoDb.execAsync(statements.join("; "));
 }
 
 async function markSynced(table: string, ids: string[]): Promise<void> {

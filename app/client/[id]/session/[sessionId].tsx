@@ -10,8 +10,8 @@ import { useSessionDetail } from "@/lib/hooks/useSessions";
 import { formatDate } from "@/lib/utils/date";
 
 export default function SessionDetailScreen() {
-  const { clientId, sessionId } = useLocalSearchParams<{ clientId: string; sessionId: string }>();
-  const { data: client } = useClient(clientId);
+  const { id, sessionId } = useLocalSearchParams<{ id: string; sessionId: string }>();
+  const { data: client } = useClient(id);
   const { data: detail, isLoading } = useSessionDetail(sessionId);
 
   if (isLoading) {
@@ -53,7 +53,7 @@ export default function SessionDetailScreen() {
           <SessionExerciseBlock
             key={block.sessionExercise.id}
             block={block}
-            clientId={clientId}
+            clientId={id}
             sessionId={sessionId}
             readOnly
             onRemoveExercise={() => {}}
