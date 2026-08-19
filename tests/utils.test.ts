@@ -3,6 +3,29 @@ import { describe, expect, it } from "vitest";
 import { buildExportBundle, serializeExportBundle } from "../lib/utils/exportBundle";
 import { formatDate, formatDateShort, todayIso } from "../lib/utils/date";
 import { clampNumber, formatReps, formatWeight } from "../lib/utils/format";
+import { getErrorMessage } from "../lib/utils/errors";
+
+describe("getErrorMessage", () => {
+  it("uses Error.message", () => {
+    expect(getErrorMessage(new Error("boom"))).toBe("boom");
+  });
+
+  it("extracts message from plain objects", () => {
+    expect(getErrorMessage({ message: "Invalid login credentials", status: 400 })).toBe(
+      "Invalid login credentials"
+    );
+  });
+
+  it("falls back to String for primitives", () => {
+    expect(getErrorMessage("oops")).toBe("oops");
+    expect(getErrorMessage(42)).toBe("42");
+    expect(getErrorMessage(null)).toBe("null");
+  });
+
+  it("does not produce [object Object]", () => {
+    expect(getErrorMessage({ code: "PGRST301", details: "x" })).not.toBe("[object Object]");
+  });
+});
 
 describe("buildExportBundle", () => {
   it("tags the bundle with version and timestamp", () => {

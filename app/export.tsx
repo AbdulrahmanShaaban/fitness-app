@@ -6,6 +6,7 @@ import { Alert, ScrollView, Text, View } from "react-native";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { exportAllRows, exportRowCounts } from "../lib/utils/exportAll";
+import { getErrorMessage } from "../lib/utils/errors";
 
 export default function ExportScreen() {
   const router = useRouter();
@@ -32,7 +33,7 @@ export default function ExportScreen() {
         { text: "OK", onPress: () => router.back() },
       ]);
     } catch (err) {
-      Alert.alert("Export failed", err instanceof Error ? err.message : String(err));
+      Alert.alert("Export failed", getErrorMessage(err));
     } finally {
       setExporting(false);
     }

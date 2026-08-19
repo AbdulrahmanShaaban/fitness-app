@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
 
 import { useAddPhoto, useDeletePhoto, usePhotos } from "../../lib/hooks/useAssessments";
+import { getErrorMessage } from "../../lib/utils/errors";
 import { persistPickedPhoto } from "../../lib/utils/photos";
 import type { PhotoAngle } from "../../types";
 import { PhotoTile } from "../shared/PhotoTile";
@@ -64,7 +65,7 @@ export function ClientPhotosSection({ clientId, assessmentId }: ClientPhotosSect
           uri: persistedUri,
         });
       } catch (err) {
-        Alert.alert("Photo error", err instanceof Error ? err.message : String(err));
+        Alert.alert("Photo error", getErrorMessage(err));
       } finally {
         setPicking(false);
       }

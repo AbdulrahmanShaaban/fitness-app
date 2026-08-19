@@ -1,5 +1,6 @@
 import type { SQLiteBindValue } from "expo-sqlite";
 
+import { getErrorMessage } from "../lib/utils/errors";
 import { useSyncStore } from "../lib/store/syncStore";
 import { getSupabase, isSyncConfigured } from "./client";
 
@@ -117,7 +118,7 @@ export async function runSync(): Promise<void> {
     store.setLastSyncAt(new Date().toISOString());
   } catch (err) {
     store.setStatus("error");
-    store.setLastError(err instanceof Error ? err.message : String(err));
+    store.setLastError(getErrorMessage(err));
   }
 }
 

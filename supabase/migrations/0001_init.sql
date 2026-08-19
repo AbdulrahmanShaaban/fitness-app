@@ -1,15 +1,12 @@
--- Supabase mirror schema for the Trainer Notebook sync layer.
--- Canonical source: supabase/migrations/0001_init.sql.
--- Run this file in the Supabase SQL editor once per project if you are not
--- using `supabase db push` (which reads the migrations directory).
--- The local SQLite database stays the source of truth; these tables are the
--- safety net. All timestamp columns are TEXT (ISO-8601) to mirror SQLite 1:1.
+-- Trainer Notebook — initial Supabase schema.
+-- Mirrors the local SQLite schema (db/schema.ts) 1:1 so the sync layer can
+-- upsert rows without any transformation. All timestamp columns are TEXT
+-- (ISO-8601) to match SQLite. Every table is scoped to the owning trainer via
+-- user_id, and RLS enforces that a trainer can only read/write their own rows.
 --
--- Setup: create a Supabase project, run this file, then put the project URL
--- and anon key into the app's .env (EXPO_PUBLIC_SUPABASE_URL /
--- EXPO_PUBLIC_SUPABASE_ANON_KEY) and log in on the sign-in screen.
+-- Apply with: supabase db push  (or paste into the Supabase dashboard SQL editor).
 
-create table if not exists public.clients (
+create table public.clients (
   id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   full_name text not null,
@@ -28,7 +25,7 @@ create table if not exists public.clients (
   synced_at text
 );
 
-create table if not exists public.sessions (
+create table public.sessions (
   id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   client_id text not null,
@@ -41,21 +38,7 @@ create table if not exists public.sessions (
   synced_at text
 );
 
-create table if not exists public.exercises (
-  id text primary key,
-  user_id uuid not null references auth.users(id) on delete cascade,
-  name text not null,
-  muscle_group text,
-  notes text,
-  video_link text,
-  is_custom boolean not null default false,
-  is_deleted boolean not null default false,
-  created_at text not null,
-  updated_at text not null,
-  synced_at text
-);
-
-create table if not exists public.session_exercises (
+create table public.session_exercises (
   id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   session_id text not null,
@@ -67,7 +50,7 @@ create table if not exists public.session_exercises (
   synced_at text
 );
 
-create table if not exists public.sets (
+create table public.sets (
   id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   session_exercise_id text not null,
@@ -82,7 +65,21 @@ create table if not exists public.sets (
   synced_at text
 );
 
-create table if not exists public.assessments (
+create table public.exercises (
+  id text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  muscle_group text,
+  notes text,
+  video_link text,
+  is_custom boolean not null default false,
+  is_deleted boolean not null default false,
+  created_at text not null,
+  updated_at text not null,
+  synced_at text
+);
+
+create table public.assessments (
   id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   client_id text not null,
@@ -96,7 +93,7 @@ create table if not exists public.assessments (
   synced_at text
 );
 
-create table if not exists public.assessment_tests (
+create table public.assessment_tests (
   id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   assessment_id text not null,
@@ -110,7 +107,7 @@ create table if not exists public.assessment_tests (
   synced_at text
 );
 
-create table if not exists public.client_photos (
+create table public.client_photos (
   id text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   client_id text not null,
@@ -124,19 +121,18 @@ create table if not exists public.client_photos (
   synced_at text
 );
 
-create index if not exists sessions_client_date_idx on public.sessions (client_id, date);
-create index if not exists session_exercises_session_idx on public.session_exercises (session_id, order_index);
-create index if not exists sets_session_exercise_idx on public.sets (session_exercise_id, set_number);
-create index if not exists assessments_client_date_idx on public.assessments (client_id, date);
-create index if not exists assessment_tests_assessment_idx on public.assessment_tests (assessment_id);
-create index if not exists client_photos_client_date_idx on public.client_photos (client_id, date);
+create index sessions_client_date_idx on public.sessions (client_id, date);
+create index session_exercises_session_idx on public.session_exercises (session_id, order_index);
+create index sets_session_exercise_idx on public.sets (session_exercise_id, set_number);
+create index assessments_client_date_idx on public.assessments (client_id, date);
+create index assessment_tests_assessment_idx on public.assessment_tests (assessment_id);
+create index client_photos_client_date_idx on public.client_photos (client_id, date);
 
--- RLS: every row is scoped to its owner; the app never bypasses RLS.
 alter table public.clients enable row level security;
 alter table public.sessions enable row level security;
-alter table public.exercises enable row level security;
 alter table public.session_exercises enable row level security;
 alter table public.sets enable row level security;
+alter table public.exercises enable row level security;
 alter table public.assessments enable row level security;
 alter table public.assessment_tests enable row level security;
 alter table public.client_photos enable row level security;
@@ -145,11 +141,11 @@ create policy "clients owner" on public.clients
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "sessions owner" on public.sessions
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy "exercises owner" on public.exercises
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "session_exercises owner" on public.session_exercises
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "sets owner" on public.sets
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "exercises owner" on public.exercises
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "assessments owner" on public.assessments
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

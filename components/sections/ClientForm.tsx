@@ -1,12 +1,17 @@
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Text, View } from "react-native";
+import { useState } from "react";
+import { Platform, Pressable, Text, View } from "react-native";
 
 import { Button } from "../ui/Button";
 import { TextField } from "../ui/TextField";
 import { SegmentedControl } from "../ui/SegmentedControl";
+import { formatDate } from "../../lib/utils/date";
 import type { Client } from "../../types";
+
+const EGYPTIAN_MOBILE = /^01[0125]\d{8}$/;
 
 const clientSchema = z.object({
   fullName: z.string().trim().min(1, "Name is required"),
@@ -14,7 +19,10 @@ const clientSchema = z.object({
   gender: z.string(),
   heightCm: z.string(),
   currentWeightKg: z.string(),
-  phone: z.string().trim(),
+  phone: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || EGYPTIAN_MOBILE.test(v), "Enter a valid Egyptian mobile (e.g. 01027566639)"),
   startDate: z
     .string()
     .trim()
@@ -56,7 +64,18 @@ function pick<T>(value: string, min: number, max: number): T | undefined {
   return n as T;
 }
 
+function formatPhoneInput(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 11);
+}
+
+function isoFromDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
+}
+
 export function ClientForm({ initial, submitLabel, onSubmit }: ClientFormProps) {
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const { control, handleSubmit, formState } = useForm<ClientFormValues>({
     resolver: zodResolver(clientSchema),
     defaultValues: {
@@ -180,19 +199,66 @@ export function ClientForm({ initial, submitLabel, onSubmit }: ClientFormProps) 
         <Controller
           control={control}
           name="startDate"
-          render={({ field }) => (
-            <TextField
-              label="Start date"
-              placeholder="2026-01-15"
-              autoCapitalize="none"
-              containerClassName="flex-1"
-              hint="YYYY-MM-DD"
-              error={formState.errors.startDate?.message}
-              value={field.value}
-              onChangeText={field.onChange}
-              onBlur={field.onBlur}
-            />
-          )}
+          render={({ field }) => {
+            const picked =
+              field.value === "" ? new Date() : new Date(`${field.value}T00:00:00`);
+            return (
+              <View className="flex-1 gap-1.5">
+                <Text className="text-muted text-[13px] font-medium">Start date</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Start date"
+                  onPress={() => setShowDatePicker(true)}
+                  className="rounded-lg border border-line bg-surface2 px-3 py-2.5"
+                >
+                  <Text className={field.value ? "text-body text-base" : "text-faint text-base"}>
+                    {field.value ? formatDate(field.value) : "Pick a date"}
+                  </Text>
+                </Pressable>
+                {showDatePicker ? (
+                  <View>
+                    {Platform.OS === "ios" ? (
+                      <>
+                        <DateTimePicker
+                          value={picked}
+                          mode="date"
+                          display="spinner"
+                          maximumDate={undefined}
+                          onValueChange={(_event, date) => {
+                            field.onChange(isoFromDate(date));
+                          }}
+                        />
+                        <Button
+                          label="Done"
+                          variant="secondary"
+                          onPress={() => setShowDatePicker(false)}
+                        />
+                      </>
+                    ) : (
+                      <DateTimePicker
+                        value={picked}
+                        mode="date"
+                        onValueChange={(_event, date) => {
+                          setShowDatePicker(false);
+                          field.onChange(isoFromDate(date));
+                        }}
+                        onDismiss={() => setShowDatePicker(false)}
+                      />
+                    )}
+                  </View>
+                ) : null}
+                {formState.errors.startDate?.message ? (
+                  <Text className="text-danger text-[12px]">
+                    {formState.errors.startDate.message}
+                  </Text>
+                ) : (
+                  <Text className="text-faint text-[12px]">
+                    {field.value ? formatDate(field.value) : "Tap to pick a date"}
+                  </Text>
+                )}
+              </View>
+            );
+          }}
         />
       </View>
 
@@ -202,10 +268,12 @@ export function ClientForm({ initial, submitLabel, onSubmit }: ClientFormProps) 
         render={({ field }) => (
           <TextField
             label="Phone"
-            placeholder="+20 100 000 0000"
+            placeholder="01027566639"
             keyboardType="phone-pad"
+            hint="Egyptian mobile: 01X XXXX XXXX"
+            error={formState.errors.phone?.message}
             value={field.value}
-            onChangeText={field.onChange}
+            onChangeText={(text) => field.onChange(formatPhoneInput(text))}
             onBlur={field.onBlur}
           />
         )}

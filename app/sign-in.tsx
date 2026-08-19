@@ -9,6 +9,7 @@ import { TextField } from "../components/ui/TextField";
 import { useSyncStore } from "../lib/store/syncStore";
 import { getSupabase, isSyncConfigured } from "../sync/client";
 import { runSync } from "../sync/engine";
+import { getErrorMessage } from "../lib/utils/errors";
 
 export default function SignInScreen() {
   const router = useRouter();
@@ -33,7 +34,7 @@ export default function SignInScreen() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        Alert.alert("Sign in failed", error.message);
+        Alert.alert("Sign in failed", getErrorMessage(error));
         return;
       }
       setSignedIn(true);
