@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Trainer Notebook",
-    "slug": "trainer-notebook",
+    "slug": "abdelrahman",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,6 +16,7 @@
       }
     },
     "android": {
+      "package": "com.abdelrahman.trainernotebook",
       "adaptiveIcon": {
         "backgroundColor": "#0B0E12",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -42,6 +43,13 @@
       ],
       "expo-splash-screen",
       "expo-asset"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "fa05fe52-17ee-4b27-9dda-8f4ed46c6041"
+      }
+    },
+    "owner": "abdelrahmanshaabann"
   }
 }
