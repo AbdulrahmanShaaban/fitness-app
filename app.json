@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "Trainer Notebook",
+    "slug": "trainer-notebook",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "trainer-notebook",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0E12",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Take progress photos for client records.",
+        "NSPhotoLibraryUsageDescription": "Pick progress photos for client records."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0E12",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-font",
+      "expo-image",
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Pick progress photos for client records.",
+          "cameraPermission": "Take progress photos for client records."
+        }
+      ],
+      "expo-splash-screen",
+      "expo-asset"
+    ]
+  }
+}
